@@ -27,12 +27,22 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=sync_engine)
     logger.info("AegisOps AI backend started — all DB tables verified.")
 
+    sim_task = None
     if settings.ENABLE_AUTO_SIMULATION:
         from app.services.simulator import simulator
-        asyncio.create_task(simulator.run())
+        sim_task = asyncio.create_task(simulator.run())
         logger.info("Telemetry simulator task started.")
 
     yield
+
+    if sim_task:
+        from app.services.simulator import simulator
+        simulator.stop()
+        sim_task.cancel()
+        try:
+            await sim_task
+        except (asyncio.CancelledError, Exception):
+            pass
 
     logger.info("AegisOps AI backend shutting down.")
 

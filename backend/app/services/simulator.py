@@ -4,6 +4,7 @@ import math
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from app.core.logging import logger
+from app.core.config import settings
 
 SERVICES_CONFIG = {
     "api-gateway": {
@@ -114,6 +115,7 @@ class TelemetrySimulator:
         self.max_logs_buffer = 500
         self.time_offset_seconds = 0
         self.step_counter = 0
+        self.is_running = False
 
     def set_traffic(self, level: str):
         mapping = {"low": 0.5, "normal": 1.0, "high": 2.5, "extreme": 5.0}
@@ -335,6 +337,27 @@ class TelemetrySimulator:
             "new_logs": new_logs,
             "active_scenarios": list(self.active_scenarios.keys()),
         }
+
+    async def run(self):
+        """Continuous background loop stepping the simulation at configured interval."""
+        self.is_running = True
+        logger.info(f"TelemetrySimulator background task started (tick={settings.SIMULATION_TICK_SECONDS}s)")
+        try:
+            while self.is_running:
+                try:
+                    self.step()
+                except Exception as e:
+                    logger.error(f"Error in TelemetrySimulator background step: {e}")
+                await asyncio.sleep(settings.SIMULATION_TICK_SECONDS)
+        except asyncio.CancelledError:
+            self.is_running = False
+            logger.info("TelemetrySimulator background task cancelled.")
+        finally:
+            self.is_running = False
+
+    def stop(self):
+        """Signals the continuous simulation loop to stop."""
+        self.is_running = False
 
 
 # Singleton simulator instance
